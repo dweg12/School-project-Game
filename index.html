@@ -3,7 +3,7 @@
   <head>
     
       <script src="https://cdn.jsdelivr.net/pyodide/v0.20.0/full/pyodide.js"></script>
-      <script src="cache.js"></script>
+<!--       <script src="cache.js"></script> -->
   </head>
   <body>
     <h1 style = font-size:70px>This is computer science work, not gaming,
@@ -51,10 +51,6 @@
         ctx.fillText("And Generating Terrain", 250, 400);
         await delay(1000);
         pyodide.globals.set('ctxMinimap',ctxMinimap);
-        cache=getCache(true);
-        pyodide.globals.set('cache',cache);
-        cache=getCache(false);
-        pyodide.globals.set('cache2',cache);
         console.log('a')
         pyodide.runPython(`
         import math
@@ -550,7 +546,7 @@
                 (0,0,1,0)]
                 self.map=map(1000)
                 self.map.addLines(lines)
-                self.useCache=js.prompt('do you want to use experimental antilag','n')=='y'
+                self.useCache=False
                 if self.useCache:
                     self.map.createCache()
                 #print('c')
