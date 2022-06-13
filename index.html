@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+      <script src="https://cdn.jsdelivr.net/pyodide/v0.20.0/full/pyodide.js"></script>
+  </head>
+  <body>
+    <canvas id="canvas" height="500" width="500"></canvas>
+    <canvas id="minimap" height="251" width="251"></canvas>
+    <p id='tps'></p>
+    <img hidden id='minimapImage' src="images/map.png">
+    <img hidden id='background' src="images/background.png">
+    <img hidden id='ghost' src="images/ghost1.png">
+    <img hidden id='ghost2' src="images/ghost2.png">
+    <img hidden id='ghost3' src="images/ghost3.png">
+    <img hidden id='ghost4' src="images/ghost4.png">
+    <img hidden id='ghostD' src="images/ghostD.png">
+    <img hidden id='coin' src="images/coin.gif">
+    <img hidden id='power' src="images/power.png">
+    <img hidden id='fruit' src="images/fruit.png">
+    <style>
+
+        #canvas{
+            background-image:url(/images/background.png);
+        }
+    </style>
+    <script src="script.js"></script>
+    <script type="text/javascript">
+      async function main(){
+        function delay(milliseconds){
+            return new Promise(resolve => {
+                setTimeout(resolve, milliseconds);
+            });
+        }
+        var ctxMinimap = document.getElementById('minimap').getContext("2d");
+        var ctx=document.getElementById('canvas').getContext("2d");
+        ctx.fillStyle = "lightblue";
+        ctx.fillRect(0, 0, 500, 500);
+        ctx.fillStyle = "black";
+        ctx.textAlign = "center";
+        ctx.font = "50px Times New Roman";
+        ctx.fillText("Loading Game: ...", 250, 250);
+        ctx.fillText("Starting Pyodide", 250, 350);
+        let pyodide = await loadPyodide();
+        ctx.clearRect(0,0,500,500);
+        ctx.fillStyle = "lightblue";
+        ctx.fillRect(0, 0, 500, 500);
+        ctx.fillStyle = "black";
+        ctx.fillText("Loading Game: ...", 250, 250);
+        ctx.font = "25px Times New Roman";
+        ctx.fillText("Getting User Preferences", 250, 350);
+        ctx.fillText("And Generating Terrain", 250, 400);
+        await delay(1000);
+        pyodide.globals.set('ctxMinimap',ctxMinimap);
+        console.log('a')
+        pyodide.runPython(`
+        import math
+        import js
+        import time
+        class Maths:
+            "Able to process trigonometry in degrees."
+            def tan(deg):
+                return math.tan(math.radians(deg))
+            def cos(deg):
+                return math.cos(math.radians(deg))
+            def acos(deg):
+                return math.degrees(math.acos(deg))
+            def sin(deg):
+                return math.sin(math.radians(deg))
+            def asin(deg):
+                return math.degrees(math.asin(deg))
+            def atan(x,y):
+                if y==0:
+                    if x>0:
+                        return 90
+                    return -90
+                return math.degrees(math.atan(x/y))
+        class map:
+            "stores the map and ghosts"
+            def __init__(self,size) -> None:
+                self.moveghost=0
+                self.reviveTime=0
+                self.runTime=0
+                self.ghostLook=0
+                self.ghostRun=False
+                self.map=[[0 for _ in range(size)] for _ in range(size)]
+                self.ghost1=Ghost(500,450,1)
+                self.ghost2=Ghost(500,450,2)
+                self.ghost3=Ghost(500,450,3)
+                self.ghost4=Ghost(500,450,4)
+                self.delay=float(js.prompt('What Delay for ghosts in tics','2'))
+            def createCache(self):
+                "loads in the cache variable to improve performance"
+                self.cache=eval(cache)
+                cacheP2=eval(cache2)
+                self.cache.update(cacheP2)
+            def validPos(self,x,y):
+                "returns if a position is a wall"
+                if x in range(len(self.map)) and y in range(len(self.map)):
+                    return self.map[x][y]==0
+                return False
+            def addLine(self,x1,y1,x2,y2):
+                "adds a wall to the map"
+                if x1==x2:
+                    if y2>y1:
+                        for y in range(y1,y2+1):
+                            self.map[x1][y]=((x1+y)%20)+1#change
+                    else:
+                        for y in range(y2,y1+1):
+                            self.map[x1][y]=((x1+y)%20)+1#change
+                if y1==y2:
+                    if x2>x1:
+                        for x in range(x1,x2+1):
+                            self.map[x][y1]=((x+y1)%20)+1#change
+                    else:
+                        for x in range(x2,x1+1):
+                            self.map[x][y1]=((x+y1)%20)+1#change
+            def addLines(self,lines):
+                "adds lines from a list"
+                for x,y,x2,y2 in lines:
+                   self.addLine(x,y,x2,y2)
+        
+            def getDistance(self,angle,x,y,angle2,skip=True):
+                "returns distance to nearest wall from position at angle as well as its texture"
+                if skip:#skip allows you to skip a large part of the raycasting as it gets loaded from cache
+                    #print(x,y,(round(angle/10))%360)
+                    #cache=min((self.cache[(round(x/5)*5,round(y/5)*5)])[(round((angle%360)/5))],(self.cache[(round(x/5)*5,round(y/5)*5)])[(round(((angle%360)-5)/5))%36],(self.cache[(round(x/5)*5,round(y/5)*5)])[(round(((angle%360)+5)/5))%36])*0.8
+                    cache=min((self.cache[(round(x/5)*5,round(y/5)*5)])[(int((angle%360)/5))],(self.cache[(round(x/5)*5,round(y/5)*5)])[(int(((angle%360)+5)/5))%36])*0.6
+                ox,oy=x,y
+                cx=(Maths.sin(angle))
+                cy=(Maths.cos(angle))
+                if skip and cache>15:
+                    x+=(cx*cache)
+                    y-=(cy*cache)
+                # print(cx,cy)
+                for _ in range(250):#250 max iterations
+                    if abs(ox-int(x))+abs(oy-int(y))>250:#250 max dist
+                        break
+                    try:
+                        x+=cx
+                        y-=cy
+                        # print(int(x),int(y))
+                        if int(x) in range(len(self.map)) and int(y) in range(len(self.map)) and self.map[int(x)][int(y)]!=0:
+                            xdif=abs(ox-int(x))
+                            ydif=abs(oy-int(y))
+                            # return int(math.sqrt(xdif**2+ydif**2))#return distance old
+                            return abs(abs(math.sqrt(xdif**2+ydif**2))*Maths.cos(abs(angle-angle2))),self.map[int(x)][int(y)]
+                    except:#out of map
+                        return 'f','f'
+                return 'f','f'
+            def ghostBlocks(self):
+                blocks=[]
+                if self.ghost1!=None:
+                    blocks.append(self.ghost1.block)
+                if self.ghost2!=None:
+                    blocks.append(self.ghost2.block)
+                if self.ghost3!=None:
+                    blocks.append(self.ghost3.block)
+                if self.ghost4!=None:
+                    blocks.append(self.ghost4.block)
+                return blocks
+            def updateGhosts(self,x,y,tps):
+                "updates all the ghost stuff"
+                if self.runTime>tps*15 and self.ghostRun:
+                    self.runTime=0
+                    self.ghostRun=False
+                    if self.ghost1!=None:
+                        self.ghost1.path=[]
+                    if self.ghost2!=None:
+                        self.ghost2.path=[]
+                    if self.ghost3!=None:
+                        self.ghost3.path=[]
+                    if self.ghost4!=None:
+                        self.ghost4.path=[]
+                if self.reviveTime>tps*20:
+                    self.reviveTime=0
+                    if self.ghost1==None:
+                        self.ghost1=Ghost(500,450,1)
+                    elif self.ghost2==None:
+                        self.ghost2=Ghost(500,450,2)
+                    elif self.ghost3==None:
+                        self.ghost3=Ghost(500,450,3)
+                    elif self.ghost4==None:
+                        self.ghost4=Ghost(500,450,4)
+                if self.ghost1==None or self.ghost2==None or self.ghost3==None or self.ghost4==None:
+                    self.reviveTime+=1
+                if self.ghostRun:
+                    self.runTime+=1
+                if self.ghostLook>15*tps:
+                    self.ghostLook=0
+                    if self.ghost1!=None:
+                        self.ghost1.path=[]
+                    if self.ghost2!=None:
+                        self.ghost2.path=[]
+                    if self.ghost3!=None:
+                        self.ghost3.path=[]
+                    if self.ghost4!=None:
+                        self.ghost4.path=[]
+                else:
+                    self.ghostLook+=1
+                if self.moveghost==1:
+                    for _ in range(max(1,int(1//self.delay))):
+                        try:
+                            if self.ghost1!=None:
+                                self.ghost1.move(self.map,(x,y),self.ghostRun,self.delay,self.ghostBlocks())
+                        except Exception as e:
+                            print('fail2',e)
+                            self.ghost1=Ghost(500,450,1)
+                        try:
+                            if self.ghost2!=None:
+                                self.ghost2.move(self.map,(x,y),self.ghostRun,self.delay,self.ghostBlocks())
+                        except:
+                            self.ghost2=Ghost(500,450,2)
+                        try:
+                            if self.ghost3!=None:
+                                self.ghost3.move(self.map,(x,y),self.ghostRun,self.delay,self.ghostBlocks())
+                        except:
+                            self.ghost3=Ghost(500,450,3)
+                        try:
+                            if self.ghost4!=None:
+                                self.ghost4.move(self.map,(x,y),self.ghostRun,self.delay,self.ghostBlocks())
+                        except:
+                            self.ghost4=Ghost(500,450,4)
+                if self.ghostRun:
+                    delay=self.delay*5
+                else:
+                    delay=self.delay
+                if float(self.moveghost)>delay or self.delay<2.0:
+                    self.moveghost=0
+                self.moveghost+=1
+                self.ghostsloc=[]
+                if self.ghost1!=None:
+                    self.ghostsloc.append((self.ghost1.x,self.ghost1.y))
+                if self.ghost2!=None:
+                    self.ghostsloc.append((self.ghost2.x,self.ghost2.y))
+                if self.ghost3!=None:
+                    self.ghostsloc.append((self.ghost3.x,self.ghost3.y))
+                if self.ghost4!=None:
+                    self.ghostsloc.append((self.ghost4.x,self.ghost4.y))
+
+                if self.ghostRun:
+                    self.ghostCoords=[]
+                    if self.ghost1!=None:
+                        self.ghostCoords.append((self.ghost1.x,self.ghost1.y,'g'))
+                    if self.ghost2!=None:
+                        self.ghostCoords.append((self.ghost2.x,self.ghost2.y,'g'))
+                    if self.ghost3!=None:
+                        self.ghostCoords.append((self.ghost3.x,self.ghost3.y,'g'))
+                    if self.ghost4!=None:
+                        self.ghostCoords.append((self.ghost4.x,self.ghost4.y,'g'))
+                else:
+                    self.ghostCoords=[]
+                    if self.ghost1!=None:
+                        self.ghostCoords.append((self.ghost1.x,self.ghost1.y,'g1'))
+                    if self.ghost2!=None:
+                        self.ghostCoords.append((self.ghost2.x,self.ghost2.y,'g2'))
+                    if self.ghost3!=None:
+                        self.ghostCoords.append((self.ghost3.x,self.ghost3.y,'g3'))
+                    if self.ghost4!=None:
+                        self.ghostCoords.append((self.ghost4.x,self.ghost4.y,'g4'))
+        class Astar:
+            "all the astar stuff"
+            class Node:
+                def __init__(self, parent=None, position=None):
+                    self.parent = parent
+                    self.position = position
+
+                    self.g = 0
+                    self.h = 0
+                    self.f = 0
+
+                def __eq__(self, other):
+                    return self.position == other.position
+
+            def astar(self,maze, start, end,size=1):
+                """Returns a list of tuples as a path from the given start to the given end in the given maze"""
+                startTime=time.time()#time out system
+                # Create start and end node
+                start_node = self.Node(None, start)
+                start_node.g = start_node.h = start_node.f = 0
+                #end_node = self.Node(None, end)
+                #end_node.g = end_node.h = end_node.f = 0
+
+                # Initialize both open and closed list
+                open_list = []
+                closed_list = set()
+                #closed_list=[]
+
+                # Add the start node
+                open_list.append(start_node)
+
+                # Loop until you find the end
+                while len(open_list) > 0:
+                    #print(f"open list length = {len(open_list)}, closed={len(closed_list)}")
+
+                    # Get the current node
+                    current_node = open_list[0]
+                    current_index = 0
+                    #hello I am Easter egg, you found me
+                    for index, item in enumerate(open_list):
+                        if item.f < current_node.f:
+                            current_node = item
+                            current_index = index
+
+                    # Pop current off open list, add to closed list
+                    open_list.pop(current_index)
+                    closed_list.add(current_node.position)
+                    # Found the goal
+                    if current_node.position == end:
+                        path = []
+                        current = current_node
+                        while current is not None:
+                            path.append(current.position)
+                            current = current.parent
+                        return path[::-1] # Return reversed path
+                    if  time.time()-startTime >0.07:
+                        #print('ghost too slow to find you, plz contact admin to report this as a bug')
+                        return []
+
+                    # Generate children
+                    children = []
+                    for new_position in [(0, -size), (0, size), (-size, 0), (size, 0)]:#,(10,10),(10,-10),(-10,-10),(-10,10)]: # Adjacent squares
+
+                        # Get node position
+                        node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
+
+                        # Make sure within range
+                        if node_position[0] > (len(maze) - 1) or node_position[0] < 0 or node_position[1] > (len(maze[0]) -1) or node_position[1] < 0:
+                            continue
+
+                        # Make sure walkable terrain
+                        if maze[node_position[0]][node_position[1]] != 0:
+                            continue
+
+                        # Create new node
+                        new_node = self.Node(current_node, node_position)
+
+                        # Append
+                        children.append(new_node)
+
+                    # Loop through children
+                    for child in children:
+                        if child.position in closed_list:
+                            continue
+
+                        # Create the f, g, and h values
+                        child.g = current_node.g + 1
+                        child.h = ((child.position[0] - end[0]) ** 2) + ((child.position[1] - end[1]) ** 2)
+                        child.f = child.g + child.h
+
+                        # Child is already in the open list
+                        for open_node in open_list:
+                            if child == open_node and child.g > open_node.g:
+                                continue
+
+                        # Add the child to the open list
+                        open_list.append(child)
+
+
+            def main(self,maze,start,end,size=1):
+                #start = (0, 0)
+                #end = (5, 0)
+                #end=(end[0]//10*10,end[1]//10*10)
+                #print(start,end)
+                try:
+                    if maze[start[0]][start[1]]==1:#tries to correct for end position being in wall
+                        try:
+                            if -1<start[0]+1<1000 and -1<start[1]<1000 and maze[start[0]+1][start[1]]==0:
+                                start=(start[0]+1,start[1])
+                            elif -1<start[0]<1000 and -1<start[1]+1<1000 and maze[start[0]][start[1]+1]==0:
+                                start=(start[0],start[1]+1)
+                            elif -1<start[0]+1<1000 and -1<start[1]+1<1000 and maze[start[0]+1][start[1]+1]==0:
+                                start=(start[0]+1,start[1]+1)
+                            elif -1<start[0]-1<1000 and -1<start[1]<1000 and maze[start[0]-1][start[1]]==0:
+                                start=(start[0]-1,start[1])
+                            elif -1<start[0]<1000 and -1<start[1]-1<1000 and maze[start[0]][start[1]-1]==0:
+                                start=(start[0],start[1]-1)
+                            elif -1<start[0]-1<1000 and -1<start[1]-1<1000 and maze[start[0]-1][start[1]-1]==0:
+                                start=(start[0]-1,start[1]-1)
+                            else:
+                                start=(0,0)
+                        except:
+                            start=(0,0)
+                    if maze[end[0]][end[1]]==1:
+                        try:
+                            if -1<end[0]+1<1000 and -1<end[1]<1000 and maze[end[0]+1][end[1]]==0:
+                                end=(end[0]+1,end[1])
+                            elif -1<end[0]<1000 and -1<end[1]+1<1000 and maze[end[0]][end[1]+1]==0:
+                                end=(end[0],end[1]+1)
+                            elif -1<end[0]+1<1000 and -1<end[1]+1<1000 and maze[end[0]+1][end[1]+1]==0:
+                                end=(end[0]+1,end[1]+1)
+                            elif -1<end[0]-1<1000 and -1<end[1]<1000 and maze[end[0]-1][end[1]]==0:
+                                end=(end[0]-1,end[1])
+                            elif -1<end[0]<1000 and -1<end[1]-1<1000 and maze[end[0]][end[1]-1]==0:
+                                end=(end[0],end[1]-1)
+                            elif -1<end[0]-1<1000 and -1<end[1]-1<1000 and maze[end[0]-1][end[1]-1]==0:
+                                end=(end[0]-1,end[1]-1)
+                            else:
+                                end=(0,0)
+                        except:
+                            end=(0,0)
+                except:
+                    pass
+                if maze[start[0]][start[1]]!=0 or maze[end[0]][end[1]]!=0:
+                    print('fail')
+                #print(end,start)
+                path = self.astar(maze, start, end,size)
+                if not path:
+                    #print(start,end,maze)
+                    pass
+                #print('p',path)
+                return path
+        class Ghost:
+            "The ghost instances"
+            def __init__(self,x,y,type):
+                self.past1=(0,0)
+                self.past2=(0,0)
+                self.past3=(0,0)
+                self.past4=(0,0)
+                #self.map is a shrunken copy of the map for smaller pathfinding to reduce lag
+                self.map=[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
+                self.Astar=Astar()
+                self.type=type
+                self.path=[]
+                self.x=x
+                self.y=y
+                self.block=(x//30,y//30)
+            def oppositeCorner(self,x,y):
+                "returns the opposit corrner to coords"
+                if x<500 and y<500:
+                    return (950,900)
+                elif y<500:
+                    return (50,900)
+                elif x<500:
+                    return (950,50)
+                else:
+                    return (50,50)
+            def oppositeCornerBig(self,x,y):
+                "returns the opposit corrner to coords on smaller map"
+                if x<16 and y<15:
+                    return (32,30)
+                elif y<15:
+                    return (0,30)
+                elif x<16:
+                    return (32,0)
+                else:
+                    return (0,0)
+            def distance(self,p1,p2):
+                return abs(p1[0]-p2[0])+abs(p1[1]-p2[1])
+            def cutOff(self,mazeOld,end,blocked):
+                "tries to cut the player off"
+                maze=[]
+                for row in mazeOld:
+                    maze.append([x for x in row])
+                for x,y in blocked:
+                    maze[min(max(x,0),32)][min(max(y,0),32)]=1
+                    maze[min(max(x+1,0),32)][min(max(y,0),32)]=1
+                    maze[min(max(x-1,0),32)][min(max(y,0),32)]=1
+                    maze[min(max(x,0),32)][min(max(y+1,0),32)]=1
+                    maze[min(max(x,0),32)][min(max(y-1,0),32)]=1
+                    maze[min(max(x+1,0),32)][min(max(y+1,0),32)]=1
+                    maze[min(max(x-1,0),32)][min(max(y+1,0),32)]=1
+                    maze[min(max(x+1,0),32)][min(max(y-1,0),32)]=1
+                    maze[min(max(x-1,0),32)][min(max(y-11,0),32)]=1
+                pEnd=self.oppositeCornerBig(end[0],end[1])
+                playerPath=self.Astar.main(maze,end,pEnd)
+                if playerPath==[]:
+                    playerPath=self.Astar.main(self.map,end,pEnd)
+                nearest=min(playerPath, key=lambda x: self.distance(x, (self.x//30,self.y//30)))
+                playerPath=playerPath[:playerPath.index(nearest)]
+                playerPath=playerPath[::-1]
+                return nearest,playerPath
+            def collisionPoint(self,path,delay):
+                p=len(path)
+                delay=delay/2
+                g=0
+                for _ in range(len(path)):#max iterations
+                    if delay >1:
+                        for _ in range(int(delay)):
+                            p-=1
+                        g+=1
+                    else:
+                        for _ in range(int(1/delay)):
+                            g+=1
+                        p-=1
+                    #print(p,g)
+                    if p<=g:
+                        #print(p,path,delay)
+                        self.block=path[max(p,0)]
+                        return
+            def move(self,maze,end,run=False,delay=2,blocks=[]):
+                "moves the ghost, calles all its ai"
+                start=(self.x,self.y)
+                if run:
+                    #print('scram')
+                    end=self.oppositeCorner(end[0],end[1])
+                    end=(end[0]//30,end[1]//30)
+                    start=(int(self.x//30),int(self.y//30))
+                    self.path=self.Astar.main(self.map,start,end)
+                    if len(self.path)>2:
+                        self.path.pop(0)
+                        x,y=self.path[0]
+                        if abs(self.x-x*30)+abs(self.y-y*30)<10:
+                            self.x,self.y=self.path.pop(0)
+                            self.x*=30
+                            self.y*=30
+                        else:
+                            try:
+                                if x*30>self.x and maze[self.x+5][self.y]==0:
+                                    self.x+=5
+                                elif x*30<self.x and maze[self.x-5][self.y]==0:
+                                    self.x-=5
+                                elif y*30>self.y and maze[self.x][self.y+5]==0:
+                                    self.y+=5
+                                elif y*30<self.y and maze[self.x][self.y-5]==0:
+                                    self.y-=5
+                                else:
+                                    self.x,self.y=self.path[0]
+                                    self.x*=30
+                                    self.y*=30
+                            except:
+                                pass
+                if abs(start[0]-end[0])+abs(start[1]-end[1])<50 and not run:
+                    #print('close')
+                    end=(min(998,max(end[0]//5*5+1,1)),min(998,max(end[1]//5*5+1,1)))
+                    start=(min(998,max(start[0]//5*5+1,1)),min(998,max(start[1]//5*5+1,1)))
+                    #print(start,end)
+                    self.path=self.Astar.main(maze,start,end,5)
+                    #print(self.path)
+                    if len(self.path)>1:
+                        self.path.pop(0)
+                        self.x,self.y=self.path.pop(0)
+                else:
+                    end=(end[0]//30,end[1]//30)
+                    start=(int(self.x//30),int(self.y//30))
+                    if len(self.path)>0:
+                        x,y=self.path[0]
+                        if abs(self.x-x*30)+abs(self.y-y*30)<10:
+                            self.x,self.y=self.path.pop(0)
+                            self.x*=30
+                            self.y*=30
+                        else:
+                            try:
+                                if x*30>self.x and maze[self.x+5][self.y]==0:
+                                    self.x+=5
+                                elif x*30<self.x and maze[self.x-5][self.y]==0:
+                                    self.x-=5
+                                elif y*30>self.y and maze[self.x][self.y+5]==0:
+                                    self.y+=5
+                                elif y*30<self.y and maze[self.x][self.y-5]==0:
+                                    self.y-=5
+                                else:
+                                    self.x,self.y=self.path[0]
+                                    self.x*=30
+                                    self.y*=30
+                            except:
+                                pass
+                        if self.x<len(maze) and self.y<len(maze) and maze[self.x][self.y]!=0:
+                            if self.map[self.x//30+1][self.y//30]==0:
+                                self.x+=5
+                            elif self.map[self.x//30-1][self.y//30]==0:
+                                self.x-=5
+                            elif self.map[self.x//30][self.y//30+1]==0:
+                                self.y+=5
+                            elif self.map[self.x//30][self.y//30-1]==0:
+                                self.y-=5
+                            else:
+                                print('h')
+                    else:
+                        #print('s')
+                        if self.type==1:
+                            self.path=self.Astar.main(self.map,start,end)
+                            if len(self.path)>1:
+                                self.path.pop(0)
+                            self.collisionPoint(self.path,delay)
+                        else:
+                            try:
+                                nearest,playerPath=self.cutOff(self.map,end,blocks)
+                            except Exception as e:
+                                print(e,f1)
+                            try:
+                                #print(nearest,start)
+                                self.path=self.Astar.main(self.map,start,nearest)
+                                for pos in self.path:
+                                    if pos in playerPath:
+                                        self.path=self.path[:self.path.index(pos)]
+                                        playerPath=playerPath[playerPath.index(pos):]
+                                self.path=self.path+playerPath
+                                if len(self.path)>2:
+                                    self.path.pop(0)
+                                self.collisionPoint(self.path,delay)
+                            except Exception as e:
+                                print(e)
+                if [self.past1,self.past2,self.past3,self.past4].count((self.x,self.y))>2 and not run:#glitched in wall for long time
+                    self.x=500
+                    self.y=450
+                    self.path=[]
+                    print('fail1')
+                else:
+                    self.past4=self.past3+tuple()
+                    self.past3=self.past2+tuple()
+                    self.past2=self.past1+tuple()
+                    self.past1=(self.x,self.y)
+
+        class player:
+            "the instance of the player"
+            def __init__(self,map) -> None:
+                self.map=map
+                self.x,self.y=30,30
+                self.rotation=0
+                self.moveSpeed=5
+            def turn(self,angle):
+                "rotates the players facing"
+                self.rotation+=angle
+                self.rotation=self.rotation%360
+            def move(self):
+                "moves the player forwards"
+                x,y=self.x,self.y
+                cx=(Maths.sin(self.rotation))
+                cy=(Maths.cos(self.rotation))
+                for _ in range(self.moveSpeed):
+                    x+=cx
+                    y-=cy
+                    if not self.map.validPos(int(x),int(y)):
+                        # print('inval')
+                        if self.map.validPos(int(x-cx),int(y)):
+                            x-=cx
+                        elif self.map.validPos(int(x),int(y+cy)):
+                            y+=cy
+                        else:
+                            x-=cx
+                            y+=cy
+                            self.x,self.y=int(x),int(y)
+                            return self.x,self.y
+                self.x,self.y=int(x),int(y)
+                return self.x,self.y
+            def moveBack(self):
+                "moves the player backwards"
+                x,y=self.x,self.y
+                cx=-(Maths.sin(self.rotation))
+                cy=-(Maths.cos(self.rotation))
+                for _ in range(self.moveSpeed):
+                    x+=cx
+                    y-=cy
+                    if not self.map.validPos(int(x),int(y)):
+                        # print('inval')
+                        x-=cx
+                        y+=cy
+                        self.x,self.y=int(x),int(y)
+                        return self.x,self.y
+                self.x,self.y=int(x),int(y)
+                return self.x,self.y
+        class display:
+            "stores all the info used to render the website"
+            def __init__(self,tk=0,tk2=0) -> None:
+                canvas = js.document.getElementById('canvas')
+                self.ctx = canvas.getContext('2d')
+            def clearMini(self):
+                "clears minimap"
+                ctxMinimap.clearRect(0, 0, 251, 352)
+                ctxMinimap.drawImage(js.document.getElementById("minimapImage"), 0, 0, 251, 235)
+            def add(self,x,y,colour="yellow"):
+                "adds item to minimap"
+                ctxMinimap.moveTo(x,y)
+                ctxMinimap.beginPath()
+                ctxMinimap.arc(int(x/2), int(y/2), 5, 0, 2 * math.pi, False);
+                ctxMinimap.fillStyle = colour
+                ctxMinimap.fill()
+                ctxMinimap.stroke()
+            def addLine(self,x,y,y2,bright,texture,width):
+                "draws a line on the canvas"
+                yEnd=y
+                seg=(abs(y-y2)/int(texture[0]))
+                self.ctx.moveTo(x, int(y))
+                self.ctx.lineWidth = width
+                for col in texture[1:]:
+                    self.ctx.beginPath()
+                    yEnd+=seg*int(col[0])
+                    if col[1:]=='bc':
+                        color='black'
+                    elif col[1:]=='bl':
+                        color=f"#{hex(min(max(bright-150,17),255))[2:]}{hex(min(max(bright-150,17),255))[2:]}{hex(min(max(bright+50,17),255))[2:]}"
+                    #div = js.document.createElement("div")
+                    #div.innerHTML = "<h1>This element was created from Python</h1>"
+                    #js.document.body.prepend(div)
+                    #print(canvas)
+                    #ctx = canvas.getContext('2d')
+                    self.ctx.strokeStyle = color
+                    self.ctx.moveTo(x, int(y))
+                    self.ctx.lineTo(x, int(yEnd))
+                    self.ctx.stroke()
+                    y=yEnd
+            def addImage(self,type,x,height,b):
+                "draws an image on the canvas"
+                if type=='g1':
+                    self.ctx.drawImage(js.document.getElementById("ghost"), x-int(height/2), 250-int(height/2), int(height), int(height))
+                if type=='g2':
+                    self.ctx.drawImage(js.document.getElementById("ghost2"), x-int(height/2), 250-int(height/2), int(height), int(height))
+                if type=='g3':
+                    self.ctx.drawImage(js.document.getElementById("ghost3"), x-int(height/2), 250-int(height/2), int(height), int(height))
+                if type=='g4':
+                    self.ctx.drawImage(js.document.getElementById("ghost4"), x-int(height/2), 250-int(height/2), int(height), int(height))
+                if type=='g':
+                    self.ctx.drawImage(js.document.getElementById("ghostD"), x-int(height/2), 250-int(height/2), int(height), int(height))
+                if type=='f':
+                    self.ctx.drawImage(js.document.getElementById("coin"), x-int(height/8), 250-int(height/8), int(height/4), int(height/4))
+                if type=='p':
+                    self.ctx.drawImage(js.document.getElementById("power"), x-int(height/8), 250-int(height/8), int(height/4), int(height/4))
+                if type=='fr':
+                    self.ctx.drawImage(js.document.getElementById("fruit"), x-int(height/8), 250-int(height/8), int(height/4), int(height/4))
+            def tick(self):
+                self.ctx.stroke()
+            def clear(self):
+                self.ctx.clearRect(0, 0, 500, 500)
+            def background(self):
+                self.ctx.drawImage(js.document.getElementById("background"), 0, 0, 500, 500)
+            def end(self):
+                "death screen"
+                self.ctx.clearRect(0, 0, 500, 500)
+                self.ctx.fillRect(0, 0, 500, 500)
+                self.ctx.fillStyle = "red"
+                self.ctx.textAlign = "center";
+                self.ctx.font = "50px Times New Roman"
+                self.ctx.fillText("You died", 250, 250)
+        class Main:
+            def __init__(self) -> None:
+                self.dead=False
+                self.score=0
+                self.food=[(30,60),(60,30),(90,30),(120,30)]
+                self.power=[(30,90),(30,120)]
+                self.fruit=[(30,150),(60,150)]
+                self.renderAccuracy=js.prompt('What Reoslution Do you want, h,m,l,x,xx','xx')
+                #define textures based of preference
+                if js.prompt('Do you want fancy rendering, brick pattern y/n','n')=='y':
+                    self.colors={1:[20,'2bl','1bc','2bl','1bc','2bl','1bc','3bl','1bc',"2bl","1bc","2bl","1bc","1bl"],
+                    2:[20,'3bc','2bl','1bc',"2bl","5bc","2bl","1bc",'2bl','1bc','1bl'],
+                    3:[20,'2bl','1bc','2bl','4bc','3bl','1bc','2bl','4bc','1bl'],
+                    4:[20,'2bl','4bc','2bl','1bc','3bl','4bc','2bl','2bc'],
+                    5:[20,'3bc','2bl','1bc','2bl','1bc','3bl','1bc','2bl','1bc','2bl','1bc','1bl'],
+                    6:[20,'2bl','1bc','2bl','8bc','2bl','1bc','2bl','1bc','1bl'],
+                    7:[20,'2bl','1bc','2bl','1bc','2bl','1bc','3bl','1bc','2bl','4bc','1bl'],
+                    8:[20,'2bl','1bc','2bl','1bc','2bl','1bc','3bl','1bc','2bl',"1bc","2bl","1bc","1bl"],
+                    9:[20,'2bl','4bc','2bl','1bc','3bl','4bc','2bl','2bc'],
+                    10:[20,'3bc','2bl','4bc','3bl','1bc','2bl','4bc','1bl'],
+                    11:[20,'2bl','1bc','2bl','1bc','2bl','5bc','2bl','1bc','2bl','1bc','1bl'],
+                    12:[20,'2bl','1bc','2bl','1bc','2bl','1bc','3bl','4bc','2bl','1bc','1bc'],
+                    13:[20,'2bl','1bc','2bl','1bc','2bl','1bc','3bl','1bc','2bl','1bc','2bl','2bc'],
+                    14:[20,'3bc','2bl','1bc','2bl','5bc','2bl','4bc','1bl'],
+                    15:[20,'2bl','1bc','2bl','4bc','3bl','1bc','2bl','1bc','2bl','1bc','1bl'],
+                    16:[20,'2bl','1bc','2bl','1bc','2bl','1bc','3bl','1bc','2bl','1bc','2bl','1bc','1bl'],
+                    17:[20,'2bl','4bc','2bl','1bc','3bl','4bc','2bl','2bc'],
+                    18:[20,'3bc','2bl','1bc','2bl','1bc','3bl','1bc','2bl','1bc','2bl','1bc','1bl'],
+                    19:[20,'2bl','1bc','2bl','8bc','2bl','4bc','1bl'],
+                    20:[20,'2bl','1bc','2bl','1bc','2bl','1bc','3bl','4bc','2bl','2bc']}#sum,'{col}{amount}','{col}{amount}'
+                else:
+                    self.colors={1:[1,'1bl'],2:[1,'1bl'],3:[1,'1bl'],4:[1,'1bl'],5:[1,'1bl'],6:[1,'1bl'],7:[1,'1bl'],8:[1,'1bl'],9:[1,'1bl'],10:[1,'1bl'],11:[1,'1bl'],12:[1,'1bl'],13:[1,'1bl'],14:[1,'1bl'],15:[1,'1bl'],16:[1,'1bl'],17:[1,'1bl'],18:[1,'1bl'],19:[1,'1bl'],20:[1,'1bl']}
+                self.size=1000
+                self.rendersize=2000
+                #all the lines needing to be added to the map
+                lines=[(0,0,999,0),(0,930,999,930),#top and bottom
+                (0,0,0,320),(0,600,0,999),#left side
+                (999,0,999,320),(999,600,999,999),#right side
+                (480,0,480,120),(480,120,520,120),(520,0,520,120),#top bump
+                (0,300,180,300),(180,300,180,420),(0,420,180,420),#left top bump
+                (0,480,180,480),(180,480,180,600),(0,600,180,600),#left bottom bump
+                (0,750,80,750),(80,750,80,780),(0,780,80,780),#left small bump
+                (999,300,820,300),(820,300,820,420),(999,420,820,420),#right top bump
+                (999,480,820,480),(820,480,820,600),(999,600,820,600),#right bottom bump
+                (999,750,920,750),(920,750,920,780),(999,780,920,780),#right small bump
+                (60,60,180,60),(180,60,180,120),(60,120,180,120),(60,60,60,120),#top box left left
+                (940,60,820,60),(820,60,820,120),(940,120,820,120),(940,60,940,120),#top box right right
+                (240,60,420,60),(420,60,420,120),(240,120,420,120),(240,60,240,120),#top box left
+                (760,60,580,60),(580,60,580,120),(760,120,580,120),(760,60,760,120),#top box right
+                (60,180,180,180),(180,180,180,240),(60,240,180,240),(60,180,60,240),#top mid box left
+                (940,180,820,180),(820,180,820,240),(940,240,820,240),(940,180,940,240),#top mid box right
+                (240,180,300,180),(300,180,300,300),(300,300,420,300),(420,300,420,330),(300,330,420,330),(300,420,300,330),(240,420,300,420),(240,180,240,420),#T top left
+                (760,180,700,180),(700,180,700,300),(700,300,580,300),(580,300,580,330),(700,330,580,330),(700,420,700,330),(760,420,700,420),(760,180,760,420),#T top right
+                (360,180,640,180),(360,180,360,240),(360,240,480,240),(480,240,480,330),(480,330,520,330),(520,240,520,330),(640,240,520,240),(640,180,640,240),#T top middle
+                (360,570,640,570),(360,570,360,600),(360,600,480,600),(480,600,480,690),(480,690,520,690),(520,600,520,690),(640,600,520,600),(640,570,640,600),#T middle
+                (360,750,640,750),(360,750,360,780),(360,780,480,780),(480,780,480,870),(480,870,520,870),(520,780,520,870),(640,780,520,780),(640,750,640,780),#T bottom
+                (240,480,300,480),(300,480,300,600),(240,600,300,600),(240,480,240,600),#left mid line
+                (760,480,700,480),(700,480,700,600),(760,600,700,600),(760,480,760,600),#right mid line
+                (240,660,240,690),(420,660,420,690),(240,660,420,660),(240,690,420,690),#left bottom line
+                (760,660,760,690),(580,660,580,690),(760,660,580,660),(760,690,580,690),#right bottom line
+                (60,660,60,690),(60,660,180,660),(180,660,180,780),(180,780,140,780),(140,780,140,690),(140,690,60,690),#left bottom l
+                (940,660,940,690),(940,660,820,660),(820,660,820,780),(820,780,860,780),(860,780,860,690),(860,690,940,690),#right bottom l
+                (60,870,420,870),(60,840,420,840),(60,870,60,840),(420,870,420,840),(300,840,300,750),(240,750,300,750),(240,840,240,750),#left bottom T
+                (940,870,580,870),(940,840,580,840),(940,870,940,840),(580,870,580,840),(700,840,700,750),(760,750,700,750),(760,840,760,750),#right bottom T
+                (360,390,480,390),(520,390,640,390),(360,510,640,510),(360,390,360,510),(640,390,640,510),#center
+                (0,0,1,0)]
+                self.map=map(1000)
+                self.tps=10
+                self.map.addLines(lines)
+                self.useCache=False
+                if self.useCache:
+                    self.map.createCache()
+                #print('c')
+                self.p=player(self.map)
+                if not True:
+                    self.tk=Tk()
+                    tk2=Tk()
+                    self.d=display(self.tk,tk2)
+                else:
+                    self.d=display()
+                # for x1,y1,x2,y2 in lines:
+                #     self.d.addTmp(x1,y1,x2,y2)
+                # self.d.tk2.mainloop()
+            def TurnR(self):
+                self.p.turn(1)
+            def TurnL(self):
+                self.p.turn(-1)
+            def Turn(self,rot):
+                self.p.rotation=rot
+            def Move(self):
+                self.p.move()
+            def MoveBack(self):
+                self.p.moveBack()
+            def tickScreen(self,x,y,ghosts):
+                "calls all the drawring stuff"
+                self.d.clear()
+                self.d.background()
+                self.d.clearMini()
+                self.d.add(int(x/2),int(y/2))
+                for gx,gy,t in ghosts:
+                    c={'g1':'red','g2':'blue','g3':'orange','g4':'pink','g':'cyan'}[t]
+                    self.d.add(int(gx/2),int(gy/2),c)
+                for itemsNum in sorted(self.renderQueue.keys()):
+                    for item in self.renderQueue[itemsNum]:
+                        if str(item[0])[0] in ['g','f','p']:
+                            self.d.addImage(*item)
+                        else:
+                            self.d.addLine(*item) 
+                self.d.tick()
+            
+            def tickPlayer(self):
+                "processes the player and its vision"
+                if self.dead:
+                    return
+                start=time.time()
+                x,y=self.p.x,self.p.y
+                self.renderQueue={}
+                self.map.updateGhosts(self.p.x,self.p.y,self.tps)#allows the map to get the newest ghost cords
+                xdisp=0
+                # print(self.map.getDistance(0,self.p.x,self.p.y))
+                if self.renderAccuracy in ['high','h']:
+                    angleRange=range(-240,240)
+                    xdispsize=500/480
+                    angleChange=4
+                    width=2
+                elif self.renderAccuracy in ['medium','m','']:
+                    angleRange=range(-120,120)
+                    xdispsize=500/240
+                    angleChange=2
+                    width=4
+                elif self.renderAccuracy in ['low','l']:
+                    angleRange=range(-60,60)
+                    xdispsize=500/120
+                    angleChange=1
+                    width=8
+                elif self.renderAccuracy in ['xlow','x']:
+                    angleRange=range(-30,30)
+                    xdispsize=500/60
+                    angleChange=0.5
+                    width=16
+                elif self.renderAccuracy in ['xxlow','xx']:
+                    angleRange=range(-15,15)
+                    xdispsize=500/30
+                    angleChange=0.25
+                    width=32
+                xdisp=0
+                for angle in angleRange:
+                    angle=self.p.rotation+(angle/angleChange)
+                    dist,texture=self.map.getDistance(angle,self.p.x,self.p.y,self.p.rotation,self.useCache)
+                    if dist!='f':
+                        if dist==0:
+                            height=250
+                        else:
+                            height=int(self.rendersize/dist)
+                        bright=250-int(dist)
+                        if height in self.renderQueue.keys():
+                            self.renderQueue[height]=self.renderQueue[height]+[(xdisp,250-int(height/2),250+int(height/2),bright,self.colors[texture],width)]
+                        else:
+                            self.renderQueue[height]=[(xdisp,250-int(height/2),250+int(height/2),bright,self.colors[texture],width)]
+                    xdisp+=xdispsize#moves it along
+                xdisp=0
+                for gx,gy,type in self.map.ghostCoords:
+                    if y-gy<0:
+                        oangle=180-int(Maths.atan(gx-x,abs(y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    else:
+                        oangle=(int(Maths.atan(gx-x,y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    if angle>180:
+                        angle=angle-360
+                    if angle<-180:
+                        angle=angle+360
+                    #print(angle,(250/60)*(angle))
+                    dist=max(0,(abs(math.sqrt((abs(self.p.x-gx)**2)+(abs(self.p.y-gy)**2)))-10))
+                    xdisp=250+((250/60)*(angle))
+                    if dist!='f':
+                        if int(dist)==0:
+                            height=1000
+                        else:
+                            height=int(self.rendersize/dist)
+                        bright=max(250-int(dist),0)
+                        if height in self.renderQueue.keys():
+                            self.renderQueue[height]=self.renderQueue[height]+[(type,xdisp,height,bright)]
+                        else:
+                            self.renderQueue[height]=[(type,xdisp,height,bright)]
+                for gx,gy in self.food:
+                    if y-gy<0:
+                        oangle=180-int(Maths.atan(gx-x,abs(y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    else:
+                        oangle=(int(Maths.atan(gx-x,y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    if angle>180:
+                        angle=angle-360
+                    if angle<-180:
+                        angle=angle+360
+                    #print(angle,(250/60)*(angle))
+                    dist=max(0,(abs(math.sqrt((abs(self.p.x-gx)**2)+(abs(self.p.y-gy)**2)))-10))
+                    xdisp=250+((250/60)*(angle))
+                    if dist!='f':
+                        if int(dist)==0:
+                            height=1000
+                        else:
+                            height=int(self.rendersize/dist)
+                        bright=max(250-int(dist),0)
+                        if height in self.renderQueue.keys():
+                            self.renderQueue[height]=self.renderQueue[height]+[('f',xdisp,height,bright)]
+                        else:
+                            self.renderQueue[height]=[('f',xdisp,height,bright)]
+                for gx,gy in self.fruit:
+                    if y-gy<0:
+                        oangle=180-int(Maths.atan(gx-x,abs(y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    else:
+                        oangle=(int(Maths.atan(gx-x,y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    if angle>180:
+                        angle=angle-360
+                    if angle<-180:
+                        angle=angle+360
+                    #print(angle,(250/60)*(angle))
+                    dist=max(0,(abs(math.sqrt((abs(self.p.x-gx)**2)+(abs(self.p.y-gy)**2)))-10))
+                    xdisp=250+((250/60)*(angle))
+                    if dist!='f':
+                        if int(dist)==0:
+                            height=1000
+                        else:
+                            height=int(self.rendersize/dist)
+                        bright=max(250-int(dist),0)
+                        if height in self.renderQueue.keys():
+                            self.renderQueue[height]=self.renderQueue[height]+[('fr',xdisp,height,bright)]
+                        else:
+                            self.renderQueue[height]=[('fr',xdisp,height,bright)]
+                for gx,gy in self.power:
+                    if y-gy<0:
+                        oangle=180-int(Maths.atan(gx-x,abs(y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    else:
+                        oangle=(int(Maths.atan(gx-x,y-gy)))
+                        angle=(oangle-self.p.rotation)
+                    if angle>180:
+                        angle=angle-360
+                    if angle<-180:
+                        angle=angle+360
+                    #print(angle,(250/60)*(angle))
+                    dist=max(0,(abs(math.sqrt((abs(self.p.x-gx)**2)+(abs(self.p.y-gy)**2)))-10))
+                    xdisp=250+((250/60)*(angle))
+                    if dist!='f':
+                        if int(dist)==0:
+                            height=1000
+                        else:
+                            height=int(self.rendersize/dist)
+                        bright=max(250-int(dist),0)
+                        if height in self.renderQueue.keys():
+                            self.renderQueue[height]=self.renderQueue[height]+[('p',xdisp,height,bright)]
+                        else:
+                            self.renderQueue[height]=[('p',xdisp,height,bright)]
+                for gx,gy in self.map.ghostsloc:
+                    if abs(x-gx)+abs(y-gy)<16:
+                        if self.map.ghostRun:
+                            if self.map.ghost1!=None and self.map.ghost1.x==gx and self.map.ghost1.y==gy:
+                                self.map.ghost1=None
+                            if self.map.ghost2!=None and self.map.ghost2.x==gx and self.map.ghost2.y==gy:
+                                self.map.ghost2=None
+                            if self.map.ghost3!=None and self.map.ghost3.x==gx and self.map.ghost3.y==gy:
+                                self.map.ghost3=None
+                            if self.map.ghost4!=None and self.map.ghost4.x==gx and self.map.ghost4.y==gy:
+                                self.map.ghost4=None
+                        else:
+                            print('you died')
+                            self.d.end()
+                            self.dead=True
+                            return
+                for gx,gy in self.food[:]:
+                    if abs(x-gx)+abs(y-gy)<5:
+                        self.food.remove((gx,gy))
+                        self.score+=1
+                        print('nom nom')
+                for gx,gy in self.fruit[:]:
+                    if abs(x-gx)+abs(y-gy)<5:
+                        self.fruit.remove((gx,gy))
+                        self.score+=20
+                        print('yum delicious')
+                for gx,gy in self.power[:]:
+                    if abs(x-gx)+abs(y-gy)<5:
+                        self.power.remove((gx,gy))
+                        self.map.ghostRun=True
+                        print('ghosts, why are you running?')
+                if self.food==[]:
+                    self.food=[(30,60),(60,30),(90,30),(120,30)]
+                if self.power==[]:
+                    self.power=[(30,90),(30,120)]
+                if self.fruit==[]:
+                    self.fruit=[(30,150),(60,150)]
+                self.tickScreen(x,y,self.map.ghostCoords)
+                self.tps=int(1/(time.time()-start))
+                js.document.getElementById('tps').textContent="tps:"+str(self.tps)
+        
+        m=Main()`);
+        ctx.clearRect(0,0,500,500)
+        ctx.fillStyle = "lightblue";
+        ctx.fillRect(0, 0, 500, 500);
+        ctx.fillStyle = "black";
+        ctx.fillText("Click to continue, W forwards, mouse look", 250, 250);
+        pyodide.globals.get('m');
+        var activeMove=false
+        var activeMoveB =false
+        function left() {
+            pyodide.runPython('m.TurnL()');
+            }
+        function right() {
+            pyodide.runPython('m.TurnR()');
+            }
+        function forward() {
+            activeMove=true
+            }
+        function backward() {
+            activeMoveB=true
+            }
+        function tmp() {
+            pyodide.runPython('m.map.ghostRun=True');
+            }
+        function update () {
+            if (activeMove){activeMove=false;pyodide.runPython('m.Move()');};if (activeMoveB){activeMoveB=false;pyodide.runPython('m.MoveBack()');};pyodide.runPython('m.tickPlayer()'); document.getElementById("canvas").style.background = "url('file:///C:/Users/dweglowski/OneDrive%20-%20The%20Perse%20School/Desktop/Website/background.png')";}
+        document.onkeydown = function(){
+            var x = event.key;
+            if (x == "a"){
+                left();};
+            if (x == "d"){
+                right();};
+            if (x == "s"){
+                backward();};
+            if (x == "w"){
+                forward();};}
+        canvas.requestPointerLock = canvas.requestPointerLock ||
+                            canvas.mozRequestPointerLock;
+        canvas.onclick = function() {
+            canvas.requestPointerLock();
+        };
+        document.addEventListener('pointerlockchange', lockChangeAlert, false);
+        var rot=0
+        pyodide.globals.set("jsrot", rot);
+        function lockChangeAlert() {
+            if (document.pointerLockElement === canvas ||
+                document.mozPointerLockElement === canvas) {
+                setInterval(update, 1);
+                console.log('The pointer lock status is now locked');
+                document.addEventListener("mousemove", updatePosition, false);
+            } else {
+                document.removeEventListener("mousemove", updatePosition, false);
+                console.log('The pointer lock status is now unlocked');
+                pyodide.runPython("m.Turn(int(0))");
+            }
+        }
+        function updatePosition(e) {
+            rot += parseInt(e.movementX/2);
+            while (rot<0){
+                rot+=360;
+            }
+            while (rot>360){
+                rot-=360;
+            }
+            pyodide.globals.set("jsrot", rot);
+            pyodide.runPython("m.Turn(int(jsrot))");
+            }
+      }
+      main();      
+      
+    </script>
+  </body>
+</html>
