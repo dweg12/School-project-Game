@@ -1,3 +1,4 @@
 Spooky update, finished ghost's ai
 Food update, added food and power ups
 Misc update, added fruit, finnished code for food, now you can slide against walls
+Food Position update, finnished code for food and fixed antilag
