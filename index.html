@@ -1197,7 +1197,7 @@
             pyodide.runPython('m.map.ghostRun=True');
             }
         function update () {
-            if (activeMove){activeMove=false;pyodide.runPython('m.Move()');};if (activeMoveB){activeMoveB=false;pyodide.runPython('m.MoveBack()');};pyodide.runPython('m.tickPlayer()'); document.getElementById("canvas").style.background = "url('file:///C:/Users/dweglowski/OneDrive%20-%20The%20Perse%20School/Desktop/Website/background.png')";}
+            if (activeMove){activeMove=false;pyodide.runPython('m.Move()');};if (activeMoveB){activeMoveB=false;pyodide.runPython('m.MoveBack()');};pyodide.runPython('m.tickPlayer()'); }
         document.onkeydown = function(){
             var x = event.key;
             if (x == "a"){
