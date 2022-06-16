@@ -1236,7 +1236,7 @@
             score = pyodide.globals.get('score');
             dead = pyodide.globals.get('dead');
             if (dead===1){
-                console.log(difficulty)
+                console.log(getCookie(difficulty))
                 if (getCookie(difficulty)!=null){
                     if (Number(getCookie(difficulty))<score){
                         const d = new Date();
