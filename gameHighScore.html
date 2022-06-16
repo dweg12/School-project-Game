@@ -1227,7 +1227,7 @@
                         d.setTime(d.getTime() + (365*24*60*60*1000));
                         let expires = "expires="+ d.toUTCString();
                         console.log('new high');
-                        document.cookie = difficulty+"="+String(score)+ expires+";";
+                        document.cookie = difficulty+"="+String(score)+";"+ expires+";";
                     }
                 }
                 else{
