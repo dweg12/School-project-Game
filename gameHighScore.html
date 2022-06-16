@@ -1197,19 +1197,18 @@
           }
           return null;
         }
+        if (getCookie(difficulty)!=null){
+              document.getElementById('highscore').textContent="highscore:"+getCookie(difficulty)
+          }
+        else{
+            document.getElementById('highscore').textContent="highscore:0"
+          }
 //         function getCookie(name) { 
 //             var cookies = '; ' + document.cookie; 
 //             var splitCookie = cookies.split('; ' + name + '='); 
 //             if (splitCookie.lenght == 2){ return splitCookie.pop();}
 //             return null;
 //             }
-          if (getCookie(difficulty)!=null){
-              document.getElementById('highscore').textContent="highscore:"+getCookie(difficulty)
-
-          }
-          else{
-              document.getElementById('highscore').textContent="highscore:0"
-          }
         ctx.clearRect(0,0,500,500)
         ctx.fillStyle = "lightblue";
         ctx.fillRect(0, 0, 500, 500);
