@@ -97,6 +97,7 @@
         cache=getCache(true);
         pyodide.globals.set('cache',cache);
         cache=getCache1(false);
+        pyodide.globals.set('cache2',cache);
         document.getElementById('Settings').style.visibility = 'visible';
         document.getElementById('SettingsL').style.visibility = 'visible';
         function waitingKeypress() {
