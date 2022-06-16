@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+      <script src="https://cdn.jsdelivr.net/pyodide/v0.20.0/full/pyodide.js"></script>
+      <script src="cache.js"></script>
+      <script src="cache1.js"></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+        import { initializeApp } from "firebase/app";
+        import { getAnalytics } from "firebase/analytics";
+      const firebaseConfig = {
+      apiKey: "AIzaSyC05TiHrC9cr_mx7sAXkOwzNVzcqOmoFNA",
+      authDomain: "htmlgame-8f263.firebaseapp.com",
+      projectId: "htmlgame-8f263",
+      storageBucket: "htmlgame-8f263.appspot.com",
+      messagingSenderId: "93223931159",
+      appId: "1:93223931159:web:9d99a9129c39f3f0557b52",
+      measurementId: "G-Z6XSGQEDW8"
+    };
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+    </script>
+  </body>
+</html>
