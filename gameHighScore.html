@@ -1180,19 +1180,34 @@
                 score=self.score
         
         m=Main()`); 
-        function getCookie(name) { 
-            var cookies = '; ' + document.cookie; 
-            var splitCookie = cookies.split('; ' + name + '='); 
-            if (splitCookie.lenght == 2){ return splitCookie.pop();}
-            return null;
+        function getCookie(cname) {
+          let name = cname + "=";
+          let decodedCookie = decodeURIComponent(document.cookie);
+          let ca = decodedCookie.split(';');
+          for(let i = 0; i <ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) == ' ') {
+              c = c.substring(1);
             }
-            if (getCookie(difficulty)!=null){
-                document.getElementById('highscore').textContent="highscore:"+getCookie(difficulty)
+            if (c.indexOf(name) == 0) {
+              return c.substring(name.length, c.length);
+            }
+          }
+          return null;
+        }
+//         function getCookie(name) { 
+//             var cookies = '; ' + document.cookie; 
+//             var splitCookie = cookies.split('; ' + name + '='); 
+//             if (splitCookie.lenght == 2){ return splitCookie.pop();}
+//             return null;
+//             }
+//             if (getCookie(difficulty)!=null){
+//                 document.getElementById('highscore').textContent="highscore:"+getCookie(difficulty)
                 
-            }
-            else{
-                document.getElementById('highscore').textContent="highscore:0"
-            }
+//             }
+//             else{
+//                 document.getElementById('highscore').textContent="highscore:0"
+//             }
         ctx.clearRect(0,0,500,500)
         ctx.fillStyle = "lightblue";
         ctx.fillRect(0, 0, 500, 500);
