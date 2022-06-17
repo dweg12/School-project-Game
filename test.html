@@ -4,35 +4,23 @@
   </head>
   <body>
     <script type="text/javascript">
-      var req; // global variable to hold request object
+     var uploadURL ="https://api.github.com/repos/dweg12/SchoolProjectGameDatabase/git/blobs" + accessToken;
 
-function loadXMLDoc(url, params)
-{
-  if(window.XMLHttpRequest) {
-    try {
-      req = new XMLHttpRequest();
-    } catch(e) {
-      req = false;
-    }
-  } else if(window.ActiveXObject) {
-    try {
-      req = new ActiveXObject("Msxml2.XMLHTTP");
-    } catch(e) {
-      try {
-        req = new ActiveXObject("Microsoft.XMLHTTP");
-      } catch(e) {
-        req = false;
-      }
-    }
-  }
-  if(req) {
-    req.onreadystatechange = processReqChange;
-    req.open("GET", url + '?' + params, true);
-    req.send(null);
-    return true;
-  }
-  return false;
-}
+console.log(uploadURL);
+
+$.ajax({
+  type: "POST",
+  url: uploadURL,
+  contentType: "application/json",
+  dataType: "json",
+  data: JSON.stringify({
+      "content": "aGVsbG8=",
+      "encoding": "utf-8"
+    })
+})
+  .done(function( data ) {
+    console.log( data );
+  });
     </script>
   </body>
 </html>
