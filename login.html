@@ -9,8 +9,10 @@
 <input type="text" id="uname" name="uname">
       <label for="pword">Password:</label>
 <input type="text" id="pword" name="pword">
+      <button type="button" onclick="submit()">Login</button>
     </form>
     <script type="text/javascript">
+      def submit(){
       var user=document.getElementById("uname").value;
       var password=document.getElementById("pword").value;
       async function main(){
@@ -32,6 +34,7 @@ const data = await response.text();
         console.log(auth)
       }
       main();
+      }
     </script>
   </body>
 </html>
