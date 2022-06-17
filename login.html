@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  </head>
+  <body>
+    <form>
+    <label for="uname">User name:</label>
+<input type="text" id="uname" name="uname">
+      <label for="pword">Password:</label>
+<input type="text" id="pword" name="pword">
+    </form>
+    <script type="text/javascript">
+      var user=document.getElementById("uname").value;
+      var password=document.getElementById("pword").value;
+      async function main(){
+     const url1 = 'https://raw.githubusercontent.com/dweg12/School-project-Game/main/database.txt'
+const response = await fetch(url1);
+const data = await response.text();
+console.log(data);
+      }
+      main();
+    </script>
+  </body>
+</html>
