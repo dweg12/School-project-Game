@@ -17,10 +17,19 @@
      const url1 = 'https://raw.githubusercontent.com/dweg12/School-project-Game/main/database.txt'
 const response = await fetch(url1);
 const data = await response.text();
-console.log(data);
         let pyodide = await loadPyodide();
         pyodide.globals.set('data',data);
-        pyodide.runPython('print(data)');
+        pyodide.globals.set('user',user);
+        pyodide.globals.set('password',password);
+        pyodide.runPython('data=eval(data)
+                          auth=0
+                          for tuser in data.keys():
+                            if data[tuser]==(user,password):
+                              auth=tuser
+                              break
+        ');
+        auth=pyodide.globals.get('auth')
+        console.log(auth)
       }
       main();
     </script>
