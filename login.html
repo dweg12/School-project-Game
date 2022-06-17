@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.20.0/full/pyodide.js"></script>
   </head>
   <body>
     <form>
@@ -17,6 +18,9 @@
 const response = await fetch(url1);
 const data = await response.text();
 console.log(data);
+        let pyodide = await loadPyodide();
+        pyodide.globals.set('data',data);
+        pyodide.runPython('print(data)');
       }
       main();
     </script>
