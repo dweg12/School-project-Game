@@ -23,7 +23,8 @@ const data = await response.text();
         pyodide.globals.set('data',data);
         pyodide.globals.set('user',user);
         pyodide.globals.set('password',password);
-        pyodide.runPython(`data=eval(data)
+        pyodide.runPython(`
+                          data=eval(data)
                           auth=0
                           for tuser in data.keys():
                             if data[tuser]==(user,password):
