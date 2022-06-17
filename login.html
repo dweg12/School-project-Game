@@ -32,7 +32,10 @@ const data = await response.text();
                               break
         `);
         auth=pyodide.globals.get('auth');
-        console.log(auth);
+        const d = new Date();
+        d.setTime(d.getTime() + (24*60*60*1000));
+        let expires = "expires="+ d.toUTCString();
+        document.cookie = auth+"="+auth+";"+ expires+";";
       }
       main();
       }
