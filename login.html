@@ -24,8 +24,9 @@ const data = await response.text();
         pyodide.globals.set('user',user);
         pyodide.globals.set('password',password);
         pyodide.runPython(`
+                          import hashlib
                           data=eval(data)
-                          password=str(hash(password))
+                          password=str(hashlib.md5(b"{password}").hexdigest())
                           auth=0
                           print(data,password,user)
                           for tuser in data.keys():
