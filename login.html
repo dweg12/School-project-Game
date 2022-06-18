@@ -13,8 +13,9 @@
     <button type="button" onclick="submit()">Login</button>
     <p id='message'></p>
     <script type="text/javascript">
+      let pyodide=0
       async function get(){
-      let pyodide = await loadPyodide();
+      pyodide = await loadPyodide();
       }
       get();
       function submit() {
