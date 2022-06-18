@@ -11,6 +11,7 @@
 <input type="text" id="pword" name="pword">
     </form>
     <button type="button" onclick="submit()">Login</button>
+    <p id='message'></p>
     <script type="text/javascript">
       function submit() {
       var user=document.getElementById("uname").value;
@@ -38,6 +39,8 @@ const data = await response.text();
         d.setTime(d.getTime() + (24*60*60*1000));
         let expires = "expires="+ d.toUTCString();
         document.cookie = "auth="+auth+";"+ expires+";";
+        if (auth!=0){window.location = "index.html"}
+        else{document.getElementById('message').textContent="Invalid username or password"}
       }
       main();
       }
