@@ -27,6 +27,7 @@ const data = await response.text();
                           data=eval(data)
                           password=str(hash(password))
                           auth=0
+                          print(data,password,user)
                           for tuser in data.keys():
                             if data[tuser]==(user,password):
                               auth=tuser
