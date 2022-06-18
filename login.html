@@ -13,6 +13,10 @@
     <button type="button" onclick="submit()">Login</button>
     <p id='message'></p>
     <script type="text/javascript">
+      async function get(){
+      let pyodide = await loadPyodide();
+      }
+      get();
       function submit() {
       var user=document.getElementById("uname").value;
       var password=document.getElementById("pword").value;
@@ -20,7 +24,6 @@
      const url1 = 'https://raw.githubusercontent.com/dweg12/School-project-Game/main/database.txt'
 const response = await fetch(url1);
 const data = await response.text();
-        let pyodide = await loadPyodide();
         pyodide.globals.set('data',data);
         pyodide.globals.set('user',user);
         pyodide.globals.set('password',password);
