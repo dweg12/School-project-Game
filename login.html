@@ -28,9 +28,7 @@ const data = await response.text();
                           data=eval(data)
                           password=str(hashlib.md5(b"{password}").hexdigest())
                           auth=0
-                          print(data,password,user)
                           for tuser in data.keys():
-                            print(data[tuser],(user,password))
                             if data[tuser]==(user,password):
                               auth=tuser
                               break
